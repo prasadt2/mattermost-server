@@ -65,12 +65,18 @@ func (a *App) installPlugin(pluginFile io.ReadSeeker, replace bool) (*model.Mani
 		return nil, model.NewAppError("uploadPlugin", "app.plugin.store_bundle.app_error", nil, err.Error(), http.StatusInternalServerError)
 	}
 
+	// Notify cluster peers to install new plugin
 	a.notifyClusterPluginEvent(
 		model.CLUSTER_EVENT_INSTALL_PLUGIN,
 		model.PluginEventData{
 			Id: manifest.Id,
 		},
 	)
+
+	// Notify clients to pull new plugin bundle
+	if err := a.notifyPluginStatusesChanged(); err != nil {
+		mlog.Error("failed to notify plugin status changed", mlog.Err(err))
+	}
 
 	return manifest, nil
 }
@@ -148,10 +154,6 @@ func (a *App) installPluginLocally(pluginFile io.ReadSeeker, replace bool) (*mod
 		a.EnablePlugin(manifest.Id)
 	}
 
-	if err := a.notifyPluginStatusesChanged(); err != nil {
-		mlog.Error("failed to notify plugin status changed", mlog.Err(err))
-	}
-
 	return manifest, nil
 }
 
@@ -160,6 +162,11 @@ func (a *App) RemovePlugin(id string) *model.AppError {
 }
 
 func (a *App) removePlugin(id string) *model.AppError {
+	// Disable plugin before removal and notify cluster peers inline.
+	if err := a.DisablePlugin(id); err != nil {
+		return err
+	}
+
 	if err := a.removePluginLocally(id); err != nil {
 		return err
 	}
@@ -212,15 +219,8 @@ func (a *App) removePluginLocally(id string) *model.AppError {
 		return model.NewAppError("removePlugin", "app.plugin.not_installed.app_error", nil, "", http.StatusBadRequest)
 	}
 
-	if pluginsEnvironment.IsActive(id) && manifest.HasClient() {
-		message := model.NewWebSocketEvent(model.WEBSOCKET_EVENT_PLUGIN_DISABLED, "", "", "", nil)
-		message.Add("manifest", manifest.ClientManifest())
-		a.Publish(message)
-	}
-
 	pluginsEnvironment.Deactivate(id)
 	pluginsEnvironment.RemovePlugin(id)
-	a.UnregisterPluginCommands(id)
 
 	err = os.RemoveAll(pluginPath)
 	if err != nil {
