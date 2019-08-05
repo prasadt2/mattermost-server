@@ -278,13 +278,8 @@ func TestNotifyClusterPluginEvent(t *testing.T) {
 		WaitForAllToSend: true,
 		Data:             expectedPluginData.ToJson(),
 	}
-	expectedMessages := findClusterMessages(model.CLUSTER_EVENT_INSTALL_PLUGIN, messages)
-	require.Equal(t, []*model.ClusterMessage{expectedInstallMessage}, expectedMessages)
-
-	// Assert install plugin message was called before status changed
-	require.Equal(t, model.CLUSTER_EVENT_INSTALL_PLUGIN, messages[0].Event)
-	require.Equal(t, model.CLUSTER_EVENT_PUBLISH, messages[1].Event)
-	require.Len(t, messages, 2)
+	actualMessages := findClusterMessages(model.CLUSTER_EVENT_INSTALL_PLUGIN, messages)
+	require.Equal(t, []*model.ClusterMessage{expectedInstallMessage}, actualMessages)
 
 	// Upgrade
 	testCluster.ClearMessages()
@@ -305,22 +300,14 @@ func TestNotifyClusterPluginEvent(t *testing.T) {
 
 	messages = testCluster.GetMessages()
 
-	// Config updates
-	require.Equal(t, model.CLUSTER_EVENT_PUBLISH, messages[0].Event)
-	require.Equal(t, model.CLUSTER_EVENT_PUBLISH, messages[1].Event)
-	require.Equal(t, model.CLUSTER_EVENT_PUBLISH, messages[2].Event)
-	require.Equal(t, model.CLUSTER_EVENT_PUBLISH, messages[3].Event)
-	require.Equal(t, model.CLUSTER_EVENT_REMOVE_PLUGIN, messages[4].Event)
-	require.Len(t, messages, 5)
-
 	expectedRemoveMessage := &model.ClusterMessage{
 		Event:            model.CLUSTER_EVENT_REMOVE_PLUGIN,
 		SendType:         model.CLUSTER_SEND_RELIABLE,
 		WaitForAllToSend: true,
 		Data:             expectedPluginData.ToJson(),
 	}
-	expectedMessages = findClusterMessages(model.CLUSTER_EVENT_REMOVE_PLUGIN, messages)
-	require.Equal(t, []*model.ClusterMessage{expectedRemoveMessage}, expectedMessages)
+	actualMessages = findClusterMessages(model.CLUSTER_EVENT_REMOVE_PLUGIN, messages)
+	require.Equal(t, []*model.ClusterMessage{expectedRemoveMessage}, actualMessages)
 
 	pluginStored, err = th.App.FileExists(expectedPath)
 	require.Nil(t, err)

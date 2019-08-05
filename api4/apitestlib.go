@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -20,6 +19,7 @@ import (
 	"github.com/mattermost/mattermost-server/config"
 	"github.com/mattermost/mattermost-server/mlog"
 	"github.com/mattermost/mattermost-server/model"
+	"github.com/mattermost/mattermost-server/plugin"
 	"github.com/mattermost/mattermost-server/store"
 	"github.com/mattermost/mattermost-server/utils"
 	"github.com/mattermost/mattermost-server/web"
@@ -138,8 +138,8 @@ func setupTestHelper(enterprise bool, updateConfig func(*model.Config)) *TestHel
 		th.tempWorkspace = dir
 	}
 
-	pluginDir := filepath.Join(th.tempWorkspace, "plugins")
-	webappDir := filepath.Join(th.tempWorkspace, "webapp")
+	pluginDir, _ := ioutil.TempDir("", "plugins")
+	webappDir, _ := ioutil.TempDir("", "plugins-webapp")
 
 	th.App.UpdateConfig(func(cfg *model.Config) {
 		*cfg.PluginSettings.Directory = pluginDir
@@ -147,6 +147,8 @@ func setupTestHelper(enterprise bool, updateConfig func(*model.Config)) *TestHel
 	})
 
 	th.App.InitPlugins(pluginDir, webappDir)
+	env, _ := plugin.NewEnvironment(th.App.NewPluginAPI, pluginDir, webappDir, th.App.Log)
+	th.App.SetPluginsEnvironment(env)
 
 	return th
 }
